@@ -20,6 +20,7 @@ use std::sync::Arc;
 use thiserror::Error;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::RwLock;
+use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, trace, warn};
 
 pub struct Server {
@@ -35,7 +36,7 @@ impl Server {
         }
     }
 
-    pub async fn run(self) {
+    pub async fn run(self, token: Option<&CancellationToken>) {
         let listener = match TcpListener::bind(&self.listen_address).await {
             Ok(sock) => sock,
             Err(err) => {
@@ -45,10 +46,10 @@ impl Server {
         };
 
         info!("Listening on: {}", self.listen_address);
-        self.accept(&listener).await;
+        self.accept(&listener, token).await;
     }
 
-    pub async fn accept(self, listener: &TcpListener) {
+    pub async fn accept(self, listener: &TcpListener, token: Option<&CancellationToken>) {
         loop {
             tokio::select! {
                  accept_result = listener.accept() => {
@@ -66,7 +67,7 @@ impl Server {
                     }
                 },
 
-                 () = shutdown_signal() => {
+                 () = shutdown_signal(token) => {
                     info!("Shutdown signal received, shutting down gracefully.");
                     break;
                 }
@@ -91,8 +92,12 @@ impl From<PacketHandlerError> for PacketProcessingError {
     fn from(e: PacketHandlerError) -> Self {
         match e {
             PacketHandlerError::Custom(reason) => Self::Custom(reason),
-            PacketHandlerError::InvalidState(reason) => {
-                warn!("{reason}");
+            PacketHandlerError::InvalidState(reason, should_warn) => {
+                if should_warn {
+                    warn!("{reason}");
+                } else {
+                    debug!("{reason}");
+                }
                 Self::Disconnected
             }
         }
@@ -156,7 +161,7 @@ async fn process_packet(
     let state = client_state.state();
 
     let just_entered_play = !*was_in_play_state && state == State::Play;
-    
+
     if just_entered_play {
         *was_in_play_state = true;
         server_state.write().await.increment();
@@ -198,10 +203,7 @@ async fn process_packet(
     if just_entered_play {
         let client_state = client_data.client().await;
         let server_state_guard = server_state.read().await;
-        if crate::handlers::enable_action_bar_if_needed(
-            &client_state,
-            &server_state_guard,
-        ) {
+        if crate::handlers::enable_action_bar_if_needed(&client_state, &server_state_guard) {
             drop(client_state);
             drop(server_state_guard);
             client_data.enable_action_bar().await;
@@ -324,17 +326,16 @@ async fn send_action_bar(
         return Ok(());
     }
 
-    let server_state_guard = server_state.read().await;
-    let Some(action_bar) = server_state_guard.action_bar() else {
+    let Some(action_bar) = server_state.read().await.action_bar().cloned() else {
         return Ok(());
     };
 
     let packet = if protocol_version.is_after_inclusive(ProtocolVersion::V1_17) {
-        PacketRegistry::SetActionBarText(SetActionBarTextPacket::new(action_bar))
+        PacketRegistry::SetActionBarText(SetActionBarTextPacket::new(&action_bar))
     } else if protocol_version.is_after_inclusive(ProtocolVersion::V1_11) {
-        PacketRegistry::LegacySetTitle(LegacySetTitlePacket::action_bar(action_bar))
+        PacketRegistry::LegacySetTitle(LegacySetTitlePacket::action_bar(&action_bar))
     } else if protocol_version.is_after_inclusive(ProtocolVersion::V1_8) {
-        PacketRegistry::LegacyChatMessage(LegacyChatMessagePacket::game_info(action_bar))
+        PacketRegistry::LegacyChatMessage(LegacyChatMessagePacket::game_info(&action_bar))
     } else {
         return Ok(());
     };

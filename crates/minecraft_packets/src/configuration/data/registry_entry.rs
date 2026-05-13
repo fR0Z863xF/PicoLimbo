@@ -1,20 +1,19 @@
 use minecraft_protocol::prelude::*;
+use std::borrow::Cow;
 
 #[derive(PacketOut)]
 pub struct RegistryEntry {
     entry_id: Identifier,
-    /// Whether the entry has any data following.
-    has_data: bool,
-    /// Entry data. Only present if Has Data is true.
-    nbt_bytes: Omitted<Vec<u8>>,
+    /// Entry data. If omitted, sourced from the selected known packs.
+    nbt_bytes: Optional<Cow<'static, [u8]>>,
 }
 
 impl RegistryEntry {
-    pub fn new(entry_id: Identifier, nbt_bytes: Vec<u8>) -> Self {
+    /// nbt_bytes should be none starting 1.21.5 (included)
+    pub fn new(entry_id: Identifier, nbt_bytes: Option<Cow<'static, [u8]>>) -> Self {
         Self {
             entry_id,
-            has_data: true,
-            nbt_bytes: Omitted::Some(nbt_bytes),
+            nbt_bytes: Optional::from(nbt_bytes),
         }
     }
 }

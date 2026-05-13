@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The plugin doesn't shutdown when shutting down the proxy
+- Do not send registry data starting 1.21.5, this should fix issues with PacketEvents some users were having
+
+## [1.12.2+mc26.1.2] - 2026-04-12
+
+### Fixed
+
+- Cobblestone blocks being placed instead of air blocks outside of schematic range
+
+## [1.12.1+mc26.1.1] - 2026-04-03
+
+### Fixed
+
+- Not properly encoded signs in schematic causes the server to not start
+- Nested tags weren't properly bundled for Windows build
+- Stable UUID generation for offline players
+
+### Updated
+
+- Upgraded to Rust 1.94.1
+- Ignoring status request warn message became debug message
+
+## [1.12.0+mc26.1] - 2026-03-25
+
+### Added
+
+- Added support for Schematic V3
+- Added some missing registries (Dialog)
+- Added tag packets (specifically, Dialog and Timeline tags for now)
+- Added support for Minecraft 26.1
+
+### Updated
+
+- Full rewrite of the registries implementation
+- Full rewrite of the NBT implementation
+- Upgraded to Rust 1.94
+
+### Fixed
+
+- Fixed time not advancing starting 1.21.11
+- Unable to send server links from the proxy
+- Player heads don't have skins (partially fixed, for recent versions only)
+
+## [1.11.0+mc1.21.11] - 2026-02-11
+
 ### Added
 
 - Added support for transfer packets (1.20.5+)

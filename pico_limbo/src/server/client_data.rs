@@ -76,7 +76,10 @@ impl ClientData {
             {
                 let start = Instant::now().add(Duration::from_secs(2));
                 let period = Duration::from_secs(2);
-                self.keep_alive_interval().await.set_interval_at(start, period).await;
+                self.keep_alive_interval()
+                    .await
+                    .set_interval_at(start, period)
+                    .await;
             } else {
                 let period = Duration::from_secs(15);
                 self.keep_alive_interval().await.set_interval(period).await;
