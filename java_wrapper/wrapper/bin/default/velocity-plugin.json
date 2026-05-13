@@ -1,0 +1,1 @@
+{"id":"pico_limbo_java_wrapper","name":"Velocity plugin to run PicoLimbo inside of Velocity","version":"1.0","authors":["Quozul"],"dependencies":[],"main":"dev.quozul.VelocityPlugin"}

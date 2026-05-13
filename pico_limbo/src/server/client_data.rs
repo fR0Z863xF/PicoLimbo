@@ -14,19 +14,22 @@ use tokio::time::Instant;
 pub struct ClientData {
     client_state: Arc<Mutex<ClientState>>,
     packet_stream: Arc<Mutex<PacketStream<TcpStream>>>,
-    interval: Arc<Mutex<ControllableInterval>>,
+    keep_alive_interval: Arc<Mutex<ControllableInterval>>,
+    action_bar_interval: Arc<Mutex<ControllableInterval>>,
 }
 
 impl ClientData {
     pub fn new(socket: TcpStream) -> Self {
         let client_state = ClientState::default();
         let packet_stream = PacketStream::new(socket);
-        let interval = ControllableInterval::new();
+        let keep_alive_interval = ControllableInterval::new();
+        let action_bar_interval = ControllableInterval::new();
 
         Self {
             client_state: Arc::new(Mutex::new(client_state)),
             packet_stream: Arc::new(Mutex::new(packet_stream)),
-            interval: Arc::new(Mutex::new(interval)),
+            keep_alive_interval: Arc::new(Mutex::new(keep_alive_interval)),
+            action_bar_interval: Arc::new(Mutex::new(action_bar_interval)),
         }
     }
 
@@ -57,7 +60,8 @@ impl ClientData {
 
     pub async fn shutdown(&self) -> Result<(), PacketStreamError> {
         self.stream().await.get_stream().shutdown().await?;
-        self.interval().await.clear_interval().await;
+        self.keep_alive_interval().await.clear_interval().await;
+        self.action_bar_interval().await.clear_interval().await;
         Ok(())
     }
 
@@ -72,21 +76,38 @@ impl ClientData {
             {
                 let start = Instant::now().add(Duration::from_secs(2));
                 let period = Duration::from_secs(2);
-                self.interval().await.set_interval_at(start, period).await;
+                self.keep_alive_interval().await.set_interval_at(start, period).await;
             } else {
                 let period = Duration::from_secs(15);
-                self.interval().await.set_interval(period).await;
+                self.keep_alive_interval().await.set_interval(period).await;
             }
             self.client().await.set_keep_alive_enabled();
         }
     }
 
     pub async fn keep_alive_tick(&self) {
-        self.interval().await.tick().await;
+        self.keep_alive_interval().await.tick().await;
     }
 
     #[inline]
-    async fn interval(&self) -> tokio::sync::MutexGuard<'_, ControllableInterval> {
-        self.interval.lock().await
+    async fn keep_alive_interval(&self) -> tokio::sync::MutexGuard<'_, ControllableInterval> {
+        self.keep_alive_interval.lock().await
+    }
+
+    // Action bar
+
+    pub async fn enable_action_bar(&self) {
+        // The first tick will happen immediately, then every 3 seconds
+        let period = Duration::from_secs(3);
+        self.action_bar_interval().await.set_interval(period).await;
+    }
+
+    pub async fn action_bar_tick(&self) {
+        self.action_bar_interval().await.tick().await;
+    }
+
+    #[inline]
+    async fn action_bar_interval(&self) -> tokio::sync::MutexGuard<'_, ControllableInterval> {
+        self.action_bar_interval.lock().await
     }
 }

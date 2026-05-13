@@ -9,7 +9,10 @@ use futures::StreamExt;
 use minecraft_packets::login::login_disconnect_packet::LoginDisconnectPacket;
 use minecraft_packets::play::client_bound_keep_alive_packet::ClientBoundKeepAlivePacket;
 use minecraft_packets::play::disconnect_packet::DisconnectPacket;
-use minecraft_protocol::prelude::State;
+use minecraft_packets::play::legacy_chat_message_packet::LegacyChatMessagePacket;
+use minecraft_packets::play::legacy_set_title_packet::LegacySetTitlePacket;
+use minecraft_packets::play::set_action_bar_text_packet::SetActionBarTextPacket;
+use minecraft_protocol::prelude::{ProtocolVersion, State};
 use net::packet_stream::PacketStreamError;
 use net::raw_packet::RawPacket;
 use std::num::TryFromIntError;
@@ -152,7 +155,9 @@ async fn process_packet(
     let protocol_version = client_state.protocol_version();
     let state = client_state.state();
 
-    if !*was_in_play_state && state == State::Play {
+    let just_entered_play = !*was_in_play_state && state == State::Play;
+    
+    if just_entered_play {
         *was_in_play_state = true;
         server_state.write().await.increment();
         let username = client_state.get_username();
@@ -189,6 +194,20 @@ async fn process_packet(
     drop(client_state);
     client_data.enable_keep_alive_if_needed().await;
 
+    // Enable action_bar periodic sending if configured (only when just entered play state)
+    if just_entered_play {
+        let client_state = client_data.client().await;
+        let server_state_guard = server_state.read().await;
+        if crate::handlers::enable_action_bar_if_needed(
+            &client_state,
+            &server_state_guard,
+        ) {
+            drop(client_state);
+            drop(server_state_guard);
+            client_data.enable_action_bar().await;
+        }
+    }
+
     Ok(())
 }
 
@@ -204,6 +223,9 @@ async fn read(
         }
         () = client_data.keep_alive_tick() => {
             send_keep_alive(client_data).await?;
+        }
+        () = client_data.action_bar_tick() => {
+            send_action_bar(client_data, server_state).await?;
         }
     }
     Ok(())
@@ -285,6 +307,40 @@ async fn send_keep_alive(client_data: &ClientData) -> Result<(), PacketProcessin
         let raw_packet = packet.encode_packet(protocol_version)?;
         client_data.write_packet(raw_packet).await?;
     }
+
+    Ok(())
+}
+
+async fn send_action_bar(
+    client_data: &ClientData,
+    server_state: &Arc<RwLock<ServerState>>,
+) -> Result<(), PacketProcessingError> {
+    let (protocol_version, state) = {
+        let client = client_data.client().await;
+        (client.protocol_version(), client.state())
+    };
+
+    if state != State::Play {
+        return Ok(());
+    }
+
+    let server_state_guard = server_state.read().await;
+    let Some(action_bar) = server_state_guard.action_bar() else {
+        return Ok(());
+    };
+
+    let packet = if protocol_version.is_after_inclusive(ProtocolVersion::V1_17) {
+        PacketRegistry::SetActionBarText(SetActionBarTextPacket::new(action_bar))
+    } else if protocol_version.is_after_inclusive(ProtocolVersion::V1_11) {
+        PacketRegistry::LegacySetTitle(LegacySetTitlePacket::action_bar(action_bar))
+    } else if protocol_version.is_after_inclusive(ProtocolVersion::V1_8) {
+        PacketRegistry::LegacyChatMessage(LegacyChatMessagePacket::game_info(action_bar))
+    } else {
+        return Ok(());
+    };
+
+    let raw_packet = packet.encode_packet(protocol_version)?;
+    client_data.write_packet(raw_packet).await?;
 
     Ok(())
 }

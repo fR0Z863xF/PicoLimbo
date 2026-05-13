@@ -1,0 +1,63 @@
+# 测试 action_bar 持久化显示的配置文件
+
+bind = "0.0.0.0:25565"
+welcome_message = "Welcome to PicoLimbo Test Server!"
+
+# 配置 action_bar 内容 - 每 3 秒自动重新发送
+action_bar = "<gradient:green:aqua><bold>✨ PicoLimbo</bold></gradient> | <gray>Action Bar 持久化测试</gray>"
+
+default_game_mode = "spectator"
+hardcore = false
+fetch_player_skins = false
+reduced_debug_info = false
+allow_unsupported_versions = false
+allow_flight = true
+accept_transfers = false
+
+[forwarding]
+method = "NONE"
+
+[world]
+spawn_position = [0.0, 320.0, 0.0]
+spawn_rotation = [0.0, 0.0]
+dimension = "overworld"
+time = "day"
+
+[world.experimental]
+view_distance = 2
+schematic_file = ""
+lock_time = false
+
+[world.boundaries]
+enabled = true
+min_y = -64
+teleport_message = "<red>You have reached the bottom of the world.</red>"
+
+[server_list]
+reply_to_status = true
+max_players = 20
+message_of_the_day = "<green>PicoLimbo</green> <gray>-</gray> <yellow>Action Bar 持久化测试</yellow>"
+show_online_player_count = true
+server_icon = "server-icon.png"
+
+[compression]
+threshold = 256
+level = 6
+
+[tab_list]
+enabled = true
+header = "<bold><gradient:green:aqua>PicoLimbo Test Server</gradient></bold>"
+footer = "<gray>Action Bar 每 3 秒自动刷新</gray>"
+player_listed = true
+
+[boss_bar]
+enabled = false
+
+[title]
+enabled = false
+
+[commands]
+spawn = "spawn"
+fly = "fly"
+fly_speed = "flyspeed"
+transfer = "transfer"

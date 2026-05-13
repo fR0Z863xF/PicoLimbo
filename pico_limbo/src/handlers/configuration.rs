@@ -243,6 +243,15 @@ pub fn send_play_packets(
     Ok(())
 }
 
+pub fn enable_action_bar_if_needed(
+    client_state: &ClientState,
+    server_state: &ServerState,
+) -> bool {
+    let protocol_version = client_state.protocol_version();
+    protocol_version.is_after_inclusive(ProtocolVersion::V1_8)
+        && server_state.action_bar().is_some()
+}
+
 fn send_tab_list_packets(batch: &mut Batch<PacketRegistry>, server_state: &ServerState) {
     if let Some(TabList { header, footer }) = server_state.tab_list() {
         let packet = TabListPacket::new(header, footer);
