@@ -1,6 +1,6 @@
 use crate::forwarding::check_velocity_key_integrity::read_velocity_key;
 use crate::forwarding::forwarding_result::ModernForwardingResult;
-use crate::handlers::login::login_start::fire_login_success;
+use crate::handlers::login::login_start::{enqueue_next_forge_step, fire_login_success};
 use crate::kick_messages::PROXY_REQUIRED_KICK_MESSAGE;
 use crate::server::batch::Batch;
 use crate::server::client_state::ClientState;
@@ -18,6 +18,44 @@ impl PacketHandler for CustomQueryAnswerPacket {
         server_state: &ServerState,
     ) -> Result<Batch<PacketRegistry>, PacketHandlerError> {
         let mut batch = Batch::new();
+
+        // First check: is this a reply to a Forge FML2 replay step?
+        // The session's `pending` map only contains ids minted by the
+        // replay state machine, so a hit definitively means "Forge
+        // path"; a miss falls through to the existing Velocity logic.
+        let recognised_forge_response = client_state
+            .forge_session_mut()
+            .is_some_and(|session| session.consume_response(self.message_id.inner()).is_some());
+
+        if recognised_forge_response {
+            // Push the next snapshot step if any remain; otherwise
+            // declare the handshake done and fire LoginSuccess.
+            let snapshot = server_state.forge_snapshot();
+            let fml2 = snapshot.as_ref().and_then(|s| s.fml2.as_ref());
+
+            let advanced = match (fml2, client_state.forge_session_mut()) {
+                (Some(fml2), Some(session)) => {
+                    enqueue_next_forge_step(&mut batch, session, fml2)
+                }
+                _ => false,
+            };
+
+            if !advanced {
+                // Snapshot exhausted — graduate the connection.
+                client_state.finish_forge_replay();
+                if let Some(game_profile) = client_state.game_profile() {
+                    fire_login_success(&mut batch, client_state, server_state, game_profile)?;
+                } else {
+                    // No GameProfile means LoginStart never queued
+                    // one — should not happen on the replay path.
+                    return Err(PacketHandlerError::custom(
+                        "Forge replay finished without a captured GameProfile",
+                    ));
+                }
+            }
+            return Ok(batch);
+        }
+
         let client_message_id = client_state.get_velocity_login_message_id();
 
         if server_state.is_modern_forwarding() && self.message_id.inner() == client_message_id {

@@ -6,6 +6,7 @@ use macros::PacketReport;
 use minecraft_packets::configuration::acknowledge_finish_configuration_packet::AcknowledgeConfigurationPacket;
 use minecraft_packets::configuration::client_bound_known_packs_packet::ClientBoundKnownPacksPacket;
 use minecraft_packets::configuration::configuration_client_bound_plugin_message_packet::ConfigurationClientBoundPluginMessagePacket;
+use minecraft_packets::configuration::configuration_server_bound_plugin_message_packet::ConfigurationServerBoundPluginMessagePacket;
 use minecraft_packets::configuration::finish_configuration_packet::FinishConfigurationPacket;
 use minecraft_packets::configuration::registry_data_packet::RegistryDataPacket;
 use minecraft_packets::configuration::update_tags_packet::UpdateTagsPacket;
@@ -153,6 +154,13 @@ pub enum PacketRegistry {
         name = "minecraft:finish_configuration"
     )]
     AcknowledgeConfiguration(AcknowledgeConfigurationPacket),
+
+    #[protocol_id(
+        state = "configuration",
+        bound = "serverbound",
+        name = "minecraft:custom_payload"
+    )]
+    ConfigurationServerBoundPluginMessage(ConfigurationServerBoundPluginMessagePacket),
 
     #[protocol_id(
         state = "configuration",
@@ -367,6 +375,9 @@ impl PacketHandler for PacketRegistry {
             Self::CustomQueryAnswer(packet) => packet.handle(client_state, server_state),
             Self::LoginAcknowledged(packet) => packet.handle(client_state, server_state),
             Self::AcknowledgeConfiguration(packet) => packet.handle(client_state, server_state),
+            Self::ConfigurationServerBoundPluginMessage(packet) => {
+                packet.handle(client_state, server_state)
+            }
             Self::SetPlayerPositionAndRotation(packet) => packet.handle(client_state, server_state),
             Self::SetPlayerPosition(packet) => packet.handle(client_state, server_state),
             Self::ChatCommand(packet) => packet.handle(client_state, server_state),

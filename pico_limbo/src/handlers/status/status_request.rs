@@ -37,8 +37,22 @@ impl PacketHandler for StatusRequestPacket {
             server_state.max_players(),
             server_state.fav_icon(),
         );
-        let packet = StatusResponsePacket::from_status_response(&status_response);
-        batch.queue(|| PacketRegistry::StatusResponse(packet));
+
+        // If the Forge bridge is enabled, fetch the cached / live
+        // `forgeData` value asynchronously and splice it into the
+        // response. Vanilla limbos take the fast (sync) path below.
+        if let Some(cache) = server_state.forge_status_cache() {
+            batch.queue_async(move || async move {
+                let forge_data = cache.get().await;
+                let response = status_response.with_forge_data(forge_data);
+                PacketRegistry::StatusResponse(
+                    StatusResponsePacket::from_status_response(&response),
+                )
+            });
+        } else {
+            let packet = StatusResponsePacket::from_status_response(&status_response);
+            batch.queue(|| PacketRegistry::StatusResponse(packet));
+        }
         Ok(batch)
     }
 }

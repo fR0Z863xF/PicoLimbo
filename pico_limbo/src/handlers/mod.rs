@@ -1,4 +1,5 @@
 mod configuration;
+mod configuration_plugin_message;
 mod handshake;
 mod login;
 mod play;

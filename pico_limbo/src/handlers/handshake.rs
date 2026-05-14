@@ -40,13 +40,15 @@ impl PacketHandler for HandshakePacket {
                         }
                     }
                     State::Login => {
-                        begin_login(client_state, server_state, &self.hostname)?;
+                        let cleaned = stash_forge_kind(client_state, &self.hostname);
+                        begin_login(client_state, server_state, &cleaned)?;
                         Ok(batch)
                     }
                     State::Transfer => {
                         if server_state.accept_transfers() {
                             client_state.set_state(State::Login);
-                            begin_login(client_state, server_state, &self.hostname)?;
+                            let cleaned = stash_forge_kind(client_state, &self.hostname);
+                            begin_login(client_state, server_state, &cleaned)?;
                             Ok(batch)
                         } else {
                             Err(PacketHandlerError::disconnect("Transfers disabled"))
@@ -59,6 +61,25 @@ impl PacketHandler for HandshakePacket {
             },
         )
     }
+}
+
+/// Inspects the Handshake `hostname` field for a Forge marker
+/// (`\0FML\0` / `\0FML2\0` / `\0FML3\0`), records the detected dialect
+/// on the `client_state`, and returns the hostname *with the marker
+/// stripped* — so downstream forwarding detection (BungeeCord /
+/// BungeeGuard) can keep parsing the original `\0`-separated payload
+/// untouched.
+fn stash_forge_kind(client_state: &mut ClientState, hostname: &str) -> String {
+    use minecraft_packets::handshaking::handshake_packet::ForgeKind;
+    let (kind, cleaned) = ForgeKind::detect(hostname);
+    if kind != ForgeKind::None {
+        tracing::info!(
+            "forge: client claims {} (hostname marker present)",
+            kind.label()
+        );
+    }
+    client_state.set_forge_kind(kind);
+    cleaned
 }
 
 fn begin_login(

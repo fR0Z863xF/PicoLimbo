@@ -1,5 +1,13 @@
 mod cli;
 mod configuration;
+// `forge` is wired up incrementally across multiple PRs (see
+// FORGE_PROTOCOL_DESIGN.md). The data structures and persistence layer
+// land first; the runtime call sites (recorder, replay, status proxy)
+// follow in subsequent steps. Suppress the transient dead-code warnings
+// for the public surface of this module — every item is exercised by
+// unit tests and will be consumed by handlers added later.
+#[allow(dead_code)]
+mod forge;
 mod forwarding;
 mod handlers;
 mod kick_messages;

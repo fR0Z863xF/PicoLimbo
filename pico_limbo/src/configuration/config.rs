@@ -2,6 +2,7 @@ use crate::configuration::boss_bar::BossBarConfig;
 use crate::configuration::commands::CommandsConfig;
 use crate::configuration::compression::CompressionConfig;
 use crate::configuration::env_placeholders::{EnvPlaceholderError, expand_env_placeholders};
+use crate::configuration::forge::ForgeConfig;
 use crate::configuration::forwarding::ForwardingConfig;
 use crate::configuration::game_mode_config::GameModeConfig;
 use crate::configuration::server_list::ServerListConfig;
@@ -77,6 +78,9 @@ pub struct Config {
     pub title: TitleConfig,
 
     pub commands: CommandsConfig,
+
+    /// Forge / NeoForge protocol bridge.
+    pub forge: ForgeConfig,
 }
 
 impl Default for Config {
@@ -100,6 +104,7 @@ impl Default for Config {
             allow_flight: false,
             accept_transfers: false,
             commands: CommandsConfig::default(),
+            forge: ForgeConfig::default(),
         }
     }
 }

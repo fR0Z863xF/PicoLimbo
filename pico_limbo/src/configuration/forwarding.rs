@@ -1,25 +1,46 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Clone, Serialize, Deserialize, Default)]
 pub struct ModernForwardingConfig {
     enabled: bool,
     secret: String,
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Clone, Serialize, Deserialize, Default)]
 pub struct BungeeCordForwardingConfig {
     enabled: bool,
     bungee_guard: bool,
     tokens: Vec<String>,
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Clone, Serialize, Deserialize, Default)]
 pub struct StructuredForwarding {
     velocity: ModernForwardingConfig,
     bungee_cord: BungeeCordForwardingConfig,
 }
 
-#[derive(Serialize, Deserialize, Default)]
+impl StructuredForwarding {
+    /// Read-only access to the `velocity` sub-config. Used by the
+    /// Forge recorder bootstrap path to extract the Modern Forwarding
+    /// secret without consuming the structured config.
+    pub fn velocity_view(&self) -> &ModernForwardingConfig {
+        &self.velocity
+    }
+}
+
+impl ModernForwardingConfig {
+    /// Whether modern forwarding is enabled.
+    pub fn enabled(&self) -> bool {
+        self.enabled
+    }
+
+    /// The shared HMAC secret. Empty when forwarding is disabled.
+    pub fn secret(&self) -> &str {
+        &self.secret
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Default)]
 #[serde(tag = "method", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum TaggedForwarding {
     #[default]
@@ -36,7 +57,7 @@ pub enum TaggedForwarding {
     Modern { secret: String },
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum ForwardingConfig {
     Structured(StructuredForwarding),

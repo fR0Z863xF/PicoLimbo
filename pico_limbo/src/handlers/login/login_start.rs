@@ -1,3 +1,4 @@
+use crate::forge::replay::should_replay;
 use crate::handlers::configuration::send_play_packets;
 use crate::kick_messages::CLIENT_MODERN_FORWARDING_NOT_SUPPORTED_KICK_MESSAGE;
 use crate::server::batch::Batch;
@@ -11,7 +12,7 @@ use minecraft_packets::login::game_profile_packet::GameProfilePacket;
 use minecraft_packets::login::login_state_packet::LoginStartPacket;
 use minecraft_packets::login::login_success_packet::LoginSuccessPacket;
 use minecraft_packets::login::set_compression_packet::SetCompressionPacket;
-use minecraft_protocol::prelude::ProtocolVersion;
+use minecraft_protocol::prelude::{Identifier, ProtocolVersion, VarInt};
 use rand::RngExt;
 
 impl PacketHandler for LoginStartPacket {
@@ -21,6 +22,32 @@ impl PacketHandler for LoginStartPacket {
         server_state: &ServerState,
     ) -> Result<Batch<PacketRegistry>, PacketHandlerError> {
         let mut batch = Batch::new();
+
+        // Forge replay takes precedence over the vanilla / Velocity
+        // paths: a Forge client is identified by the marker on the
+        // Handshake hostname (already stashed on `client_state`), and
+        // we have a snapshot to replay back at it. When *both* of those
+        // are true, we drive the FML2 plugin-message exchange first
+        // and only fall through to LoginSuccess once the snapshot is
+        // exhausted.
+        if should_replay(client_state.forge_kind())
+            && let Some(snapshot) = server_state.forge_snapshot()
+            && let Some(fml2) = snapshot.fml2.as_ref()
+            && !fml2.steps.is_empty()
+        {
+            // Capture the client's identity now — we will fire
+            // LoginSuccess for it once the replay completes.
+            let game_profile: GameProfile = self.into();
+            client_state.set_game_profile(game_profile);
+
+            client_state.start_forge_replay();
+            // Push the first recorded step.
+            if let Some(session) = client_state.forge_session_mut() {
+                let _ = enqueue_next_forge_step(&mut batch, session, fml2);
+            }
+            return Ok(batch);
+        }
+
         if server_state.is_modern_forwarding() {
             if client_state.protocol_version().is_modern() {
                 login_start_velocity(&mut batch, client_state);
@@ -32,6 +59,46 @@ impl PacketHandler for LoginStartPacket {
             fire_login_success(&mut batch, client_state, server_state, game_profile)?;
         }
         Ok(batch)
+    }
+}
+
+/// Picks the next recorded snapshot step (if any) and queues a
+/// clientbound `CustomQueryPacket` carrying its channel + payload.
+/// Returns `Ok(true)` when a step was queued; `Ok(false)` if the
+/// snapshot is exhausted.
+pub fn enqueue_next_forge_step(
+    batch: &mut Batch<PacketRegistry>,
+    session: &mut crate::forge::replay::Fml2ReplaySession,
+    snapshot: &crate::forge::snapshot::Fml2Snapshot,
+) -> bool {
+    let Some((message_id, step)) = session.take_next_step(snapshot) else {
+        return false;
+    };
+    // The recorded `channel` is a free-form string (Forge uses
+    // `fml:loginwrapper` and `fml:handshake`, NeoForge uses similar).
+    // We bypass the strict `Identifier::new` parser and reuse
+    // `Identifier::new_unchecked` since we are forwarding bytes
+    // captured from a known-good upstream.
+    let identifier = parse_channel_identifier(&step.channel);
+    let packet = CustomQueryPacket {
+        message_id: VarInt::new(message_id),
+        channel: identifier,
+        data: step.payload.clone(),
+    };
+    batch.queue(move || PacketRegistry::CustomQuery(packet));
+    true
+}
+
+/// Splits a channel string of the form `namespace:value` into an
+/// [`Identifier`] using the unchecked constructor (Forge channels
+/// occasionally contain characters outside the strict identifier
+/// grammar). Falls back to the `fml:handshake` placeholder if the
+/// channel string is malformed.
+fn parse_channel_identifier(channel: &str) -> Identifier {
+    if let Some((ns, val)) = channel.split_once(':') {
+        Identifier::new_unchecked(ns, val)
+    } else {
+        Identifier::new_unchecked("fml", "handshake")
     }
 }
 

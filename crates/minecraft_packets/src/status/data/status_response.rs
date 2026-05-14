@@ -34,6 +34,18 @@ pub struct StatusResponse {
         default = "get_default_enforces_secure_chat"
     )]
     pub enforces_secure_chat: bool,
+
+    /// Forge / NeoForge protocol bridge payload, opaque to PicoLimbo —
+    /// when present, advertises this server as Forge-compatible to the
+    /// vanilla / Forge client browsing the server list. Vanilla servers
+    /// omit this entirely (the field is `skip_serializing_if` to avoid
+    /// emitting `"forgeData": null`).
+    #[serde(
+        rename = "forgeData",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
+    pub forge_data: Option<Value>,
 }
 
 fn get_default_enforces_secure_chat() -> bool {
@@ -63,6 +75,14 @@ impl StatusResponse {
             description,
             favicon,
             enforces_secure_chat: false,
+            forge_data: None,
         }
+    }
+
+    /// Attaches a Forge / NeoForge `forgeData` payload. Pass `None` to
+    /// keep the response vanilla.
+    pub fn with_forge_data(mut self, forge_data: Option<Value>) -> Self {
+        self.forge_data = forge_data;
+        self
     }
 }

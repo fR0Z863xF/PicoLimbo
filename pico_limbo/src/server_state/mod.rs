@@ -1,5 +1,7 @@
 use crate::configuration::boss_bar::EnabledBossBarConfig;
 use crate::configuration::commands::CommandsConfig;
+use crate::forge::snapshot::Snapshot;
+use crate::forge::status_proxy::ForgeStatusCache;
 use crate::server::game_mode::GameMode;
 use base64::engine::general_purpose;
 use base64::{Engine, alphabet, engine};
@@ -111,6 +113,16 @@ pub struct ServerState {
     allow_unsupported_versions: bool,
     allow_flight: bool,
     server_commands: ServerCommands,
+    /// Optional Forge / NeoForge protocol bridge. `Some` when
+    /// `[forge].enabled = true` in the operator config; `None` otherwise
+    /// (zero-cost on the vanilla hot path).
+    forge_status_cache: Option<Arc<ForgeStatusCache>>,
+    /// Recorded Forge handshake snapshot, loaded once at startup and
+    /// shared across every Forge client connection by the replay state
+    /// machine. `None` when no on-disk snapshot exists yet (e.g.
+    /// recording failed) — those clients will be kicked with a
+    /// helpful message instead of replayed.
+    forge_snapshot: Option<Arc<Snapshot>>,
 }
 
 impl ServerState {
@@ -262,6 +274,19 @@ impl ServerState {
         &self.server_commands
     }
 
+    /// Returns the Forge status-cache handle, if the Forge bridge has
+    /// been enabled at startup. Cloning the `Arc` is cheap and lets the
+    /// caller `await` against it without holding any `ServerState`
+    /// locks.
+    pub fn forge_status_cache(&self) -> Option<Arc<ForgeStatusCache>> {
+        self.forge_status_cache.clone()
+    }
+
+    /// Returns the immutable Forge handshake snapshot, if loaded.
+    pub fn forge_snapshot(&self) -> Option<Arc<Snapshot>> {
+        self.forge_snapshot.clone()
+    }
+
     pub fn increment(&self) {
         self.connected_clients.fetch_add(1, Ordering::SeqCst);
     }
@@ -303,6 +328,8 @@ pub struct ServerStateBuilder {
     allow_flight: bool,
     accept_transfers: bool,
     server_commands: ServerCommands,
+    forge_status_cache: Option<Arc<ForgeStatusCache>>,
+    forge_snapshot: Option<Arc<Snapshot>>,
 }
 
 #[derive(Debug, Error)]
@@ -574,6 +601,24 @@ impl ServerStateBuilder {
         self
     }
 
+    /// Installs the Forge status-cache. Pass `None` (the default) to
+    /// keep the limbo vanilla.
+    pub fn forge_status_cache(
+        &mut self,
+        cache: Option<Arc<ForgeStatusCache>>,
+    ) -> &mut Self {
+        self.forge_status_cache = cache;
+        self
+    }
+
+    /// Installs the Forge handshake snapshot used by the replay
+    /// state machine. Pass `None` to disable replay (vanilla
+    /// behaviour).
+    pub fn forge_snapshot(&mut self, snapshot: Option<Arc<Snapshot>>) -> &mut Self {
+        self.forge_snapshot = snapshot;
+        self
+    }
+
     /// Finish building, returning an error if any required fields are missing.
     pub fn build(self) -> Result<ServerState, ServerStateBuilderError> {
         let world = if self.schematic_file_path.is_empty() {
@@ -619,6 +664,8 @@ impl ServerStateBuilder {
             allow_flight: self.allow_flight,
             accept_transfers: self.accept_transfers,
             server_commands: self.server_commands,
+            forge_status_cache: self.forge_status_cache,
+            forge_snapshot: self.forge_snapshot,
         })
     }
 }
