@@ -246,7 +246,7 @@ impl ClientState {
     /// Tears down the FML3 session once `FinishConfiguration` has
     /// been pushed and the connection has graduated to Play.
     #[allow(dead_code)] // Wired up by Step 9.5 configuration handler.
-    pub fn finish_forge_fml3_replay(&mut self) {
+    pub const fn finish_forge_fml3_replay(&mut self) {
         self.forge_fml3_session = None;
     }
 }

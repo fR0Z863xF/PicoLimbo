@@ -1,9 +1,9 @@
-//! Replay state machines for Forge / NeoForge handshakes.
+//! Replay state machines for Forge / `NeoForge` handshakes.
 //!
 //! The recorder (`recorder.rs`) captures the *server→client* plugin
 //! message sequence from an upstream Forge backend. This module is the
 //! mirror image: it takes that recorded sequence and pushes it back at
-//! a real Forge client connecting to PicoLimbo, so the client sees
+//! a real Forge client connecting to `PicoLimbo`, so the client sees
 //! responses indistinguishable from the upstream's.
 //!
 //! Only one dialect is implemented for now: **FML2** (Minecraft
@@ -14,20 +14,20 @@
 //! # FML2 replay protocol
 //!
 //! 1. Client sends `LoginStart`.
-//! 2. PicoLimbo emits the first recorded snapshot step as a clientbound
+//! 2. `PicoLimbo` emits the first recorded snapshot step as a clientbound
 //!    `LoginPluginRequest` (`CustomQueryPacket`) — a fresh
 //!    `message_id` is allocated and stored in the session's `pending`
 //!    map so the inbound response can be matched.
 //! 3. Client replies with `LoginPluginResponse` carrying the same
 //!    `message_id`.
-//! 4. PicoLimbo looks up the `message_id` in `pending`, removes it, and
+//! 4. `PicoLimbo` looks up the `message_id` in `pending`, removes it, and
 //!    either:
 //!    * sends the next recorded step (steps remain), or
 //!    * fires `LoginSuccess` and transitions the connection into the
 //!      Configuration / Play state (handshake complete).
 //!
 //! The session is owned by `ClientState` and intentionally Clone-able
-//! so the same value can flow through PacketHandler return values.
+//! so the same value can flow through `PacketHandler` return values.
 
 use std::collections::HashMap;
 
@@ -103,11 +103,11 @@ impl Fml2ReplaySession {
 }
 
 /// Returns `true` when a client carrying the given [`ForgeKind`] should
-/// trigger a replay instead of the vanilla LoginStart fast path.
+/// trigger a replay instead of the vanilla `LoginStart` fast path.
 ///
 /// Currently only FML2 is supported in replay; FML3 follows in a later
 /// step. Vanilla / unsupported clients always take the fast path.
-pub fn should_replay(kind: ForgeKind) -> bool {
+pub const fn should_replay(kind: ForgeKind) -> bool {
     matches!(kind, ForgeKind::Fml2 | ForgeKind::Fml3)
 }
 
@@ -145,13 +145,13 @@ impl Fml3ReplaySession {
     }
 
     /// `true` when every recorded step has been pushed to the client.
-    pub fn is_complete(&self, snapshot: &Fml3Snapshot) -> bool {
+    pub const fn is_complete(&self, snapshot: &Fml3Snapshot) -> bool {
         self.next_step >= snapshot.steps.len()
     }
 
     /// Total number of steps already delivered.
     #[allow(dead_code)] // Reserved for diagnostics.
-    pub fn steps_delivered(&self) -> usize {
+    pub const fn steps_delivered(&self) -> usize {
         self.next_step
     }
 }
@@ -166,7 +166,7 @@ mod tests {
             steps: (0..n)
                 .map(|i| Fml2Step {
                     channel: format!("fml:loginwrapper#{i}"),
-                    payload: vec![i as u8],
+                    payload: vec![u8::try_from(i).expect("test step count fits in u8")],
                 })
                 .collect(),
         }

@@ -1,8 +1,8 @@
 //! Thin async client that drives Minecraft connections **outwards** —
-//! i.e. PicoLimbo connecting to another Minecraft server (the upstream
-//! Forge / NeoForge bootstrap).
+//! i.e. `PicoLimbo` connecting to another Minecraft server (the upstream
+//! Forge / `NeoForge` bootstrap).
 //!
-//! Existing PicoLimbo code is server-side: it accepts a [`TcpStream`] and
+//! Existing `PicoLimbo` code is server-side: it accepts a [`TcpStream`] and
 //! reads serverbound packets / writes clientbound packets. The Forge
 //! bridge needs to do the opposite: connect to a server, send serverbound
 //! packets ourselves, and read clientbound packets back. We build that on
@@ -10,7 +10,7 @@
 //! compression and timeouts are shared with the rest of the codebase.
 //!
 //! The client is *protocol-low-level*: it knows how to send a Handshake
-//! and a LoginStart, how to read a [`RawPacket`], and how to drive
+//! and a `LoginStart`, how to read a [`RawPacket`], and how to drive
 //! compression. It does **not** know about Forge — that lives in
 //! `recorder.rs` / `status_proxy.rs` which build on top.
 
@@ -62,7 +62,7 @@ pub mod packet_ids {
     pub const CB_CONFIG_FINISH_CONFIGURATION: u8 = 0x03;
     /// `Select Known Packs` (0x0E in 1.20.5+, clientbound). The server
     /// asks which datapack versions the client has installed so it
-    /// can omit redundant registry-data entries. NeoForge ≥1.20.5
+    /// can omit redundant registry-data entries. `NeoForge` ≥1.20.5
     /// blocks the rest of the configuration phase until the client
     /// acks this — see [`SB_CONFIG_ACKNOWLEDGE_KNOWN_PACKS`].
     pub const CB_CONFIG_SELECT_KNOWN_PACKS: u8 = 0x0E;
@@ -149,10 +149,7 @@ impl UpstreamClient {
     /// `addr` may be any string that `TcpStream::connect` accepts
     /// (`host:port`, `1.2.3.4:25565`, …). The whole connect operation
     /// is bounded by `connect_timeout`.
-    pub async fn connect(
-        addr: &str,
-        connect_timeout: Duration,
-    ) -> Result<Self, UpstreamError> {
+    pub async fn connect(addr: &str, connect_timeout: Duration) -> Result<Self, UpstreamError> {
         let socket = timeout(connect_timeout, TcpStream::connect(addr))
             .await
             .map_err(|_| UpstreamError::ConnectTimeout {
@@ -210,9 +207,8 @@ impl UpstreamClient {
         writer.write(&port)?;
         writer.write(&VarInt::new(intent.wire_value()))?;
 
-        let raw = RawPacket::new(writer.into_inner()).map_err(|_| {
-            UpstreamError::Malformed("empty handshake packet".into())
-        })?;
+        let raw = RawPacket::new(writer.into_inner())
+            .map_err(|_| UpstreamError::Malformed("empty handshake packet".into()))?;
         self.stream.write_packet(raw).await?;
         Ok(())
     }
@@ -227,7 +223,7 @@ impl UpstreamClient {
     /// Sends a Login Start packet in the **1.20.2+** layout
     /// (`name: String`, `uuid: UUID(16 bytes)`).
     ///
-    /// This is the format every Forge ≥ 1.20.1 and every NeoForge
+    /// This is the format every Forge ≥ 1.20.1 and every `NeoForge`
     /// release accepts, which covers our entire FML2 (recorded with a
     /// `protocol_version` ≤ 763) **and** FML3 target range. For pre-1.19
     /// servers the recorder is currently not supported — see the design
@@ -268,9 +264,8 @@ impl UpstreamClient {
         }
         // else: pre-1.19, just name; ignore the UUID.
 
-        let raw = RawPacket::new(writer.into_inner()).map_err(|_| {
-            UpstreamError::Malformed("empty login_start packet".into())
-        })?;
+        let raw = RawPacket::new(writer.into_inner())
+            .map_err(|_| UpstreamError::Malformed("empty login_start packet".into()))?;
         self.stream.write_packet(raw).await?;
         Ok(())
     }
@@ -299,9 +294,8 @@ impl UpstreamClient {
                 writer.write(&0u8)?;
             }
         }
-        let raw = RawPacket::new(writer.into_inner()).map_err(|_| {
-            UpstreamError::Malformed("empty login_plugin_response".into())
-        })?;
+        let raw = RawPacket::new(writer.into_inner())
+            .map_err(|_| UpstreamError::Malformed("empty login_plugin_response".into()))?;
         self.stream.write_packet(raw).await?;
         Ok(())
     }
@@ -326,9 +320,8 @@ impl UpstreamClient {
         writer.write(&packet_ids::SB_CONFIG_PLUGIN_MESSAGE)?;
         write_var_int_prefixed_string(&mut writer, channel)?;
         writer.write_bytes(data)?;
-        let raw = RawPacket::new(writer.into_inner()).map_err(|_| {
-            UpstreamError::Malformed("empty config_plugin_message".into())
-        })?;
+        let raw = RawPacket::new(writer.into_inner())
+            .map_err(|_| UpstreamError::Malformed("empty config_plugin_message".into()))?;
         self.stream.write_packet(raw).await?;
         Ok(())
     }
@@ -345,17 +338,12 @@ impl UpstreamClient {
 
     /// Sends `Acknowledge Known Packs` (serverbound 0x07) with an
     /// empty list — the canonical "I don't have any of the datapacks
-    /// you advertised, send me the full registry" answer. NeoForge
+    /// you advertised, send me the full registry" answer. `NeoForge`
     /// ≥1.20.5 requires this before it will continue the
     /// Configuration phase handshake.
-    pub async fn send_config_acknowledge_known_packs_empty(
-        &mut self,
-    ) -> Result<(), UpstreamError> {
+    pub async fn send_config_acknowledge_known_packs_empty(&mut self) -> Result<(), UpstreamError> {
         // Body is a single VarInt(0) — zero known packs.
-        let raw = RawPacket::from_bytes(
-            packet_ids::SB_CONFIG_ACKNOWLEDGE_KNOWN_PACKS,
-            &[0u8],
-        );
+        let raw = RawPacket::from_bytes(packet_ids::SB_CONFIG_ACKNOWLEDGE_KNOWN_PACKS, &[0u8]);
         self.stream.write_packet(raw).await?;
         Ok(())
     }
@@ -492,10 +480,7 @@ mod tests {
             .send_handshake(769, "localhost", 25565, HandshakeIntent::Status)
             .await
             .expect("handshake");
-        client
-            .send_status_request()
-            .await
-            .expect("status request");
+        client.send_status_request().await.expect("status request");
 
         let raw = client
             .read_packet(Duration::from_secs(5))
@@ -503,15 +488,13 @@ mod tests {
             .expect("read status response");
 
         assert_eq!(raw.packet_id(), Some(packet_ids::CB_STATUS_RESPONSE));
-        let mut reader =
-            minecraft_protocol::prelude::BinaryReader::new(raw.data());
+        let mut reader = minecraft_protocol::prelude::BinaryReader::new(raw.data());
         let json: minecraft_protocol::prelude::VarIntPrefixedString =
             reader.read().expect("read status string");
         let body = json.into_inner();
         eprintln!("== upstream status JSON ==\n{body}");
 
-        let parsed: serde_json::Value =
-            serde_json::from_str(&body).expect("parse status JSON");
+        let parsed: serde_json::Value = serde_json::from_str(&body).expect("parse status JSON");
         let has_forge_data = parsed.get("forgeData").is_some();
         eprintln!("forgeData present? {has_forge_data}");
         // We don't hard-assert on `forgeData` here — vanilla servers

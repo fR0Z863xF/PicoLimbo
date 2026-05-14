@@ -3,7 +3,7 @@
 //!
 //! Two distinct purposes:
 //!
-//! 1. **FML3 replay** — when a 1.20.2+ Forge / NeoForge client is in
+//! 1. **FML3 replay** — when a 1.20.2+ Forge / `NeoForge` client is in
 //!    the middle of a recorded handshake, every inbound `fml:handshake`
 //!    (or `neoforge:handshake`) reply advances the
 //!    [`Fml3ReplaySession`] cursor and triggers the next outbound
@@ -37,7 +37,10 @@ impl PacketHandler for ConfigurationServerBoundPluginMessagePacket {
         // pass through as no-ops.
         let chan = self.channel.to_string();
         if !is_forge_handshake_channel(&chan) {
-            debug!("configuration plugin message on non-forge channel `{}` ignored", chan);
+            debug!(
+                "configuration plugin message on non-forge channel `{}` ignored",
+                chan
+            );
             return Ok(batch);
         }
 
@@ -80,7 +83,7 @@ fn emit_next_fml3_step(
     let data = step
         .payload
         .iter()
-        .map(|&b| b as i8)
+        .map(|&b| b.cast_signed())
         .collect::<Vec<i8>>();
     let packet = ConfigurationClientBoundPluginMessagePacket::raw(channel, data);
     batch.queue(move || PacketRegistry::ConfigurationClientBoundPluginMessage(packet));
@@ -88,7 +91,7 @@ fn emit_next_fml3_step(
 }
 
 /// True for `fml:*` and `neoforge:*` channels — the two namespaces
-/// Forge / NeoForge use for their FML3 handshake exchange.
+/// Forge / `NeoForge` use for their FML3 handshake exchange.
 fn is_forge_handshake_channel(channel: &str) -> bool {
     channel.starts_with("fml:") || channel.starts_with("neoforge:")
 }
@@ -121,8 +124,14 @@ mod tests {
 
     #[test]
     fn parse_channel_identifier_round_trips_known_channels() {
-        assert_eq!(parse_channel_identifier("fml:handshake").to_string(), "fml:handshake");
-        assert_eq!(parse_channel_identifier("neoforge:handshake").to_string(), "neoforge:handshake");
+        assert_eq!(
+            parse_channel_identifier("fml:handshake").to_string(),
+            "fml:handshake"
+        );
+        assert_eq!(
+            parse_channel_identifier("neoforge:handshake").to_string(),
+            "neoforge:handshake"
+        );
     }
 
     #[test]

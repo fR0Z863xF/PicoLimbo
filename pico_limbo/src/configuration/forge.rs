@@ -1,15 +1,15 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-/// Configuration for the Forge / NeoForge protocol bridge.
+/// Configuration for the Forge / `NeoForge` protocol bridge.
 ///
-/// PicoLimbo can pretend to be a Forge server by *replaying* a snapshot of
+/// `PicoLimbo` can pretend to be a Forge server by *replaying* a snapshot of
 /// the Login/Configuration-phase handshake recorded against an upstream
 /// Forge bootstrap server, and by *passing through* the Status response's
 /// `forgeData` field with a short-lived cache.
 ///
 /// The whole feature is gated behind [`ForgeConfig::enabled`]; when disabled,
-/// PicoLimbo behaves exactly like a vanilla limbo (the cost is one `match`
+/// `PicoLimbo` behaves exactly like a vanilla limbo (the cost is one `match`
 /// per Handshake packet).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
@@ -19,14 +19,14 @@ pub struct ForgeConfig {
     /// limbo behaves identically to a non-Forge build.
     pub enabled: bool,
 
-    /// Address of the upstream Forge/NeoForge bootstrap server used to:
+    /// Address of the upstream Forge/`NeoForge` bootstrap server used to:
     ///   * record the Login/Configuration handshake snapshot on startup
     ///     (when [`Self::record_on_start`] is `true`); and
     ///   * fetch the live `forgeData` field returned by the upstream's
     ///     status response.
     ///
     /// Expected form: `host:port`. The bootstrap server **must** run with
-    /// `online-mode=false` and without any forwarding plugin (BungeeCord /
+    /// `online-mode=false` and without any forwarding plugin (`BungeeCord` /
     /// Velocity), otherwise the recorder will be rejected and the snapshot
     /// will never be written.
     pub upstream: String,
@@ -48,13 +48,13 @@ pub struct ForgeConfig {
     pub status_cache_ttl_secs: u64,
 
     /// Hard timeout, in milliseconds, for a single upstream Status request.
-    /// On timeout PicoLimbo falls back to the snapshot's cached
+    /// On timeout `PicoLimbo` falls back to the snapshot's cached
     /// `forgeData` (if any) and serves the response anyway.
     pub status_request_timeout_ms: u64,
 
     /// Hard timeout, in milliseconds, for the entire startup-time recording
-    /// session. If the upstream has not driven the handshake to LoginSuccess
-    /// (FML2) / FinishConfiguration (FML3) by then, recording is aborted and
+    /// session. If the upstream has not driven the handshake to `LoginSuccess`
+    /// (FML2) / `FinishConfiguration` (FML3) by then, recording is aborted and
     /// the snapshot is *not* written.
     pub record_timeout_ms: u64,
 

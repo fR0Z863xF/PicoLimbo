@@ -40,11 +40,7 @@ pub struct StatusResponse {
     /// vanilla / Forge client browsing the server list. Vanilla servers
     /// omit this entirely (the field is `skip_serializing_if` to avoid
     /// emitting `"forgeData": null`).
-    #[serde(
-        rename = "forgeData",
-        skip_serializing_if = "Option::is_none",
-        default
-    )]
+    #[serde(rename = "forgeData", skip_serializing_if = "Option::is_none", default)]
     pub forge_data: Option<Value>,
 }
 

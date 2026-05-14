@@ -1,7 +1,7 @@
 //! On-disk representation of a recorded Forge handshake.
 //!
-//! A [`Snapshot`] captures everything PicoLimbo needs at runtime to convince
-//! a Forge / NeoForge client that it is talking to a real Forge server:
+//! A [`Snapshot`] captures everything `PicoLimbo` needs at runtime to convince
+//! a Forge / `NeoForge` client that it is talking to a real Forge server:
 //!
 //! * the ordered list of *server-bound-to-client* plugin messages exchanged
 //!   during the FML2 (Login phase) and/or FML3 (Configuration phase)
@@ -30,7 +30,7 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum SnapshotError {
     /// A snapshot was loaded from disk but its `version` field does not
-    /// match what this build of PicoLimbo understands. The caller should
+    /// match what this build of `PicoLimbo` understands. The caller should
     /// either run a migration or rerecord.
     #[error("unsupported snapshot version: found {found}, expected {expected}")]
     UnsupportedVersion { found: u32, expected: u32 },
@@ -57,17 +57,17 @@ pub enum SnapshotSection {
 ///
 /// The `payload` is the raw `data` field of the corresponding clientbound
 /// `Login Plugin Request` packet (i.e. *not* including the `message_id`
-/// VarInt — that is generated fresh at replay time, see
+/// `VarInt` — that is generated fresh at replay time, see
 /// [`crate::forge::snapshot::Fml2Snapshot`]).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Fml2Step {
     /// Channel identifier such as `"fml:loginwrapper"` or
     /// `"fml:handshake"`. Stored as a plain string because Forge channel
     /// names can contain characters outside the strict
-    /// `pico_identifier::Identifier` grammar (NeoForge in particular uses
+    /// `pico_identifier::Identifier` grammar (`NeoForge` in particular uses
     /// custom namespaces).
     pub channel: String,
-    /// Opaque payload bytes. Replayed verbatim — PicoLimbo never inspects
+    /// Opaque payload bytes. Replayed verbatim — `PicoLimbo` never inspects
     /// the contents.
     #[serde(with = "base64_bytes")]
     pub payload: Vec<u8>,
@@ -86,11 +86,11 @@ impl Fml2Snapshot {
     }
 
     /// Number of recorded steps.
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.steps.len()
     }
 
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.steps.is_empty()
     }
 }
@@ -121,12 +121,12 @@ impl Fml3Snapshot {
     }
 
     #[allow(dead_code)]
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.steps.len()
     }
 
     #[allow(dead_code)]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.steps.is_empty()
     }
 }
@@ -198,8 +198,8 @@ impl Snapshot {
     }
 
     /// Returns `Ok(())` if the schema version matches what this build of
-    /// PicoLimbo understands; otherwise an [`SnapshotError::UnsupportedVersion`].
-    pub fn check_version(&self) -> Result<(), SnapshotError> {
+    /// `PicoLimbo` understands; otherwise an [`SnapshotError::UnsupportedVersion`].
+    pub const fn check_version(&self) -> Result<(), SnapshotError> {
         if self.version == Self::CURRENT_VERSION {
             Ok(())
         } else {

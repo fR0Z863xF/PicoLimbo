@@ -45,9 +45,9 @@ impl PacketHandler for StatusRequestPacket {
             batch.queue_async(move || async move {
                 let forge_data = cache.get().await;
                 let response = status_response.with_forge_data(forge_data);
-                PacketRegistry::StatusResponse(
-                    StatusResponsePacket::from_status_response(&response),
-                )
+                PacketRegistry::StatusResponse(StatusResponsePacket::from_status_response(
+                    &response,
+                ))
             });
         } else {
             let packet = StatusResponsePacket::from_status_response(&status_response);

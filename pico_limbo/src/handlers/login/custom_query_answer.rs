@@ -34,9 +34,7 @@ impl PacketHandler for CustomQueryAnswerPacket {
             let fml2 = snapshot.as_ref().and_then(|s| s.fml2.as_ref());
 
             let advanced = match (fml2, client_state.forge_session_mut()) {
-                (Some(fml2), Some(session)) => {
-                    enqueue_next_forge_step(&mut batch, session, fml2)
-                }
+                (Some(fml2), Some(session)) => enqueue_next_forge_step(&mut batch, session, fml2),
                 _ => false,
             };
 

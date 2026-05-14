@@ -113,7 +113,7 @@ pub struct ServerState {
     allow_unsupported_versions: bool,
     allow_flight: bool,
     server_commands: ServerCommands,
-    /// Optional Forge / NeoForge protocol bridge. `Some` when
+    /// Optional Forge / `NeoForge` protocol bridge. `Some` when
     /// `[forge].enabled = true` in the operator config; `None` otherwise
     /// (zero-cost on the vanilla hot path).
     forge_status_cache: Option<Arc<ForgeStatusCache>>,
@@ -603,10 +603,7 @@ impl ServerStateBuilder {
 
     /// Installs the Forge status-cache. Pass `None` (the default) to
     /// keep the limbo vanilla.
-    pub fn forge_status_cache(
-        &mut self,
-        cache: Option<Arc<ForgeStatusCache>>,
-    ) -> &mut Self {
+    pub fn forge_status_cache(&mut self, cache: Option<Arc<ForgeStatusCache>>) -> &mut Self {
         self.forge_status_cache = cache;
         self
     }

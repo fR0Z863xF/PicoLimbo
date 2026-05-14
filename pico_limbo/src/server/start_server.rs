@@ -83,7 +83,7 @@ fn extract_velocity_secret(cfg: &Config) -> Option<Vec<u8>> {
                 None
             }
         }
-        _ => None,
+        ForwardingConfig::Tagged(_) => None,
     }
 }
 
@@ -91,10 +91,7 @@ fn extract_velocity_secret(cfg: &Config) -> Option<Vec<u8>> {
 /// upstream when `forge.enabled = true && forge.record_on_start =
 /// true`. The session is best-effort: any failure is logged and we
 /// keep going.
-async fn maybe_record_forge_snapshot(
-    forge_cfg: &ForgeConfig,
-    velocity_secret: Option<&[u8]>,
-) {
+async fn maybe_record_forge_snapshot(forge_cfg: &ForgeConfig, velocity_secret: Option<&[u8]>) {
     if !forge_cfg.enabled || !forge_cfg.record_on_start {
         return;
     }
@@ -106,8 +103,8 @@ async fn maybe_record_forge_snapshot(
 
     match record_and_persist(forge_cfg, None, velocity_secret).await {
         Ok(snapshot) => {
-            let fml2 = snapshot.fml2.as_ref().map(|s| s.steps.len()).unwrap_or(0);
-            let fml3 = snapshot.fml3.as_ref().map(|s| s.steps.len()).unwrap_or(0);
+            let fml2 = snapshot.fml2.as_ref().map_or(0, |s| s.steps.len());
+            let fml3 = snapshot.fml3.as_ref().map_or(0, |s| s.steps.len());
             info!(
                 "Forge bridge: recording session complete (FML2: {} steps, FML3: {} steps)",
                 fml2, fml3
@@ -295,8 +292,8 @@ fn load_full_snapshot(path: &std::path::Path) -> Option<Snapshot> {
     match load_snapshot(path) {
         Ok(LoadOutcome::Loaded(snapshot)) => {
             let snapshot: Snapshot = *snapshot;
-            let fml2_steps = snapshot.fml2.as_ref().map(|s| s.steps.len()).unwrap_or(0);
-            let fml3_steps = snapshot.fml3.as_ref().map(|s| s.steps.len()).unwrap_or(0);
+            let fml2_steps = snapshot.fml2.as_ref().map_or(0, |s| s.steps.len());
+            let fml3_steps = snapshot.fml3.as_ref().map_or(0, |s| s.steps.len());
             info!(
                 "Loaded Forge snapshot from {} (FML2 steps: {}, FML3 steps: {})",
                 path.display(),

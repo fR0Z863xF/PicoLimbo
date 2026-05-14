@@ -68,10 +68,11 @@ pub fn load_snapshot(path: impl AsRef<Path>) -> Result<LoadOutcome, SnapshotIoEr
         }
     };
 
-    let snapshot: Snapshot = serde_json::from_slice(&bytes).map_err(|source| SnapshotIoError::Parse {
-        path: path.to_path_buf(),
-        source,
-    })?;
+    let snapshot: Snapshot =
+        serde_json::from_slice(&bytes).map_err(|source| SnapshotIoError::Parse {
+            path: path.to_path_buf(),
+            source,
+        })?;
     snapshot.check_version()?;
     Ok(LoadOutcome::Loaded(Box::new(snapshot)))
 }
@@ -82,10 +83,7 @@ pub fn load_snapshot(path: impl AsRef<Path>) -> Result<LoadOutcome, SnapshotIoEr
 /// destination so that readers always see either the previous valid
 /// content or the new valid content — never a torn partial file. The
 /// parent directory is created on demand.
-pub fn save_snapshot(
-    path: impl AsRef<Path>,
-    snapshot: &Snapshot,
-) -> Result<(), SnapshotIoError> {
+pub fn save_snapshot(path: impl AsRef<Path>, snapshot: &Snapshot) -> Result<(), SnapshotIoError> {
     let path = path.as_ref();
     if let Some(parent) = path.parent()
         && !parent.as_os_str().is_empty()
@@ -117,16 +115,16 @@ pub fn save_snapshot(
 /// `rename` is atomic on the same filesystem) and is obviously transient.
 fn tmp_path_for(path: &Path) -> PathBuf {
     let mut tmp = path.to_path_buf();
-    let new_name = match tmp.file_name() {
-        Some(name) => {
+    let new_name = tmp.file_name().map_or_else(
+        // Should never happen — `path` is supposed to point at a file.
+        // Fall back to a generic name in the same directory.
+        || std::ffi::OsString::from("snapshot.tmp"),
+        |name| {
             let mut owned = name.to_os_string();
             owned.push(".tmp");
             owned
-        }
-        // Should never happen — `path` is supposed to point at a file.
-        // Fall back to a generic name in the same directory.
-        None => std::ffi::OsString::from("snapshot.tmp"),
-    };
+        },
+    );
     tmp.set_file_name(new_name);
     tmp
 }
@@ -163,7 +161,7 @@ mod tests {
         // Intentionally do not create the file.
         match load_snapshot(&path).unwrap() {
             LoadOutcome::Missing => {}
-            other => panic!("expected Missing, got {other:?}"),
+            other @ LoadOutcome::Loaded(_) => panic!("expected Missing, got {other:?}"),
         }
     }
 

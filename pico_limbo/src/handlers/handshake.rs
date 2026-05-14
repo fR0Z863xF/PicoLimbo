@@ -66,8 +66,8 @@ impl PacketHandler for HandshakePacket {
 /// Inspects the Handshake `hostname` field for a Forge marker
 /// (`\0FML\0` / `\0FML2\0` / `\0FML3\0`), records the detected dialect
 /// on the `client_state`, and returns the hostname *with the marker
-/// stripped* — so downstream forwarding detection (BungeeCord /
-/// BungeeGuard) can keep parsing the original `\0`-separated payload
+/// stripped* — so downstream forwarding detection (`BungeeCord` /
+/// `BungeeGuard`) can keep parsing the original `\0`-separated payload
 /// untouched.
 fn stash_forge_kind(client_state: &mut ClientState, hostname: &str) -> String {
     use minecraft_packets::handshaking::handshake_packet::ForgeKind;

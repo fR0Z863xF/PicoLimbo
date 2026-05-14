@@ -159,10 +159,10 @@ mod tests {
         // after the original hostname; Forge clients prepend their marker
         // before that payload. Make sure stripping the Forge marker preserves
         // the rest so legacy forwarding still parses correctly.
-        let raw = "mc.example.com\0FML2\0\0127.0.0.1\0deadbeef";
+        let raw = "mc.example.com\0FML2\0\x00127.0.0.1\0deadbeef";
         let (kind, cleaned) = ForgeKind::detect(raw);
         assert_eq!(kind, ForgeKind::Fml2);
-        assert_eq!(cleaned, "mc.example.com\0127.0.0.1\0deadbeef");
+        assert_eq!(cleaned, "mc.example.com\x00127.0.0.1\0deadbeef");
     }
 
     #[test]

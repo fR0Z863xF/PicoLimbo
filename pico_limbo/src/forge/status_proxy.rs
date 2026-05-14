@@ -1,6 +1,6 @@
 //! Pass-through cache for the upstream's Status-phase `forgeData` field.
 //!
-//! Forge / NeoForge clients require the server-list-ping JSON to contain
+//! Forge / `NeoForge` clients require the server-list-ping JSON to contain
 //! a `forgeData` object before they will display the green ✓ next to the
 //! entry and let the user click "Join". The contents of that field are
 //! opaque to us (they include the mod list, channel registrations and a
@@ -26,9 +26,7 @@
 //!    will see the ❓ icon but the limbo itself stays healthy.
 
 use crate::configuration::forge::ForgeConfig;
-use crate::forge::upstream_client::{
-    HandshakeIntent, UpstreamClient, UpstreamError, packet_ids,
-};
+use crate::forge::upstream_client::{HandshakeIntent, UpstreamClient, UpstreamError, packet_ids};
 use minecraft_protocol::prelude::{BinaryReader, VarIntPrefixedString};
 use serde_json::Value;
 use std::sync::Arc;
@@ -88,8 +86,7 @@ impl ForgeStatusCache {
         let snapshot_fallback;
         {
             let guard = self.inner.lock().await;
-            if let (Some(value), Some(fetched_at)) =
-                (guard.value.as_ref(), guard.fetched_at)
+            if let (Some(value), Some(fetched_at)) = (guard.value.as_ref(), guard.fetched_at)
                 && fetched_at.elapsed() < self.config.status_cache_ttl()
             {
                 trace!("forge: status cache hit (age {:?})", fetched_at.elapsed());
@@ -101,9 +98,11 @@ impl ForgeStatusCache {
         // Slow path: try a live fetch.
         match self.fetch_upstream().await {
             Ok(Some(value)) => {
-                let mut guard = self.inner.lock().await;
-                guard.value = Some(value.clone());
-                guard.fetched_at = Some(Instant::now());
+                {
+                    let mut guard = self.inner.lock().await;
+                    guard.value = Some(value.clone());
+                    guard.fetched_at = Some(Instant::now());
+                }
                 debug!(
                     "forge: status cache refreshed from {}",
                     self.config.upstream
@@ -127,7 +126,12 @@ impl ForgeStatusCache {
                     "forge: status fetch from {} failed: {}; falling back to {}",
                     self.config.upstream,
                     e,
-                    if self.inner.try_lock().map(|g| g.value.is_some()).unwrap_or(false) {
+                    if self
+                        .inner
+                        .try_lock()
+                        .map(|g| g.value.is_some())
+                        .unwrap_or(false)
+                    {
                         "stale cache"
                     } else if snapshot_fallback.is_some() {
                         "snapshot fallback"
@@ -146,11 +150,13 @@ impl ForgeStatusCache {
     #[allow(dead_code)] // Wired up by Step 10.
     pub async fn refresh(&self) -> Result<(), UpstreamError> {
         let value = self.fetch_upstream().await?;
-        let mut guard = self.inner.lock().await;
-        if let Some(v) = value {
-            guard.value = Some(v);
+        {
+            let mut guard = self.inner.lock().await;
+            if let Some(v) = value {
+                guard.value = Some(v);
+            }
+            guard.fetched_at = Some(Instant::now());
         }
-        guard.fetched_at = Some(Instant::now());
         Ok(())
     }
 
@@ -165,17 +171,22 @@ impl ForgeStatusCache {
     /// Connects to the upstream, performs a Status ping, parses the
     /// JSON and returns the `forgeData` field (if any).
     async fn fetch_upstream(&self) -> Result<Option<Value>, UpstreamError> {
-        let timeout_total = self.config.status_request_timeout();
-        let mut client =
-            UpstreamClient::connect(&self.config.upstream, timeout_total).await?;
-
         // Protocol version 769 (1.21.4) is a safe modern default — the
         // upstream's Status response does not actually depend on the
         // declared version, but we still have to send a syntactically
         // valid handshake.
         const STATUS_PING_PROTOCOL: i32 = 769;
+
+        let timeout_total = self.config.status_request_timeout();
+        let mut client = UpstreamClient::connect(&self.config.upstream, timeout_total).await?;
+
         client
-            .send_handshake(STATUS_PING_PROTOCOL, "limbo-status-probe", 25565, HandshakeIntent::Status)
+            .send_handshake(
+                STATUS_PING_PROTOCOL,
+                "limbo-status-probe",
+                25565,
+                HandshakeIntent::Status,
+            )
             .await?;
         client.send_status_request().await?;
 
@@ -291,7 +302,7 @@ mod tests {
         assert_eq!(json, json!(["unexpected", "array"]));
     }
 
-    /// Live test against the configured PICOLIMBO_TEST_UPSTREAM server.
+    /// Live test against the configured `PICOLIMBO_TEST_UPSTREAM` server.
     /// Verifies the cache transitions from cold → fresh → cached.
     #[tokio::test]
     #[ignore = "requires a live Forge Minecraft server"]
@@ -302,7 +313,10 @@ mod tests {
         let cache = ForgeStatusCache::new(cfg, None);
 
         let first = cache.get().await.expect("upstream should have forgeData");
-        eprintln!("forge data keys: {:?}", first.as_object().map(|o| o.keys().collect::<Vec<_>>()));
+        eprintln!(
+            "forge data keys: {:?}",
+            first.as_object().map(|o| o.keys().collect::<Vec<_>>())
+        );
         assert!(
             first.get("fmlNetworkVersion").is_some(),
             "expected fmlNetworkVersion in forgeData"

@@ -79,7 +79,7 @@ pub struct Config {
 
     pub commands: CommandsConfig,
 
-    /// Forge / NeoForge protocol bridge.
+    /// Forge / `NeoForge` protocol bridge.
     pub forge: ForgeConfig,
 }
 

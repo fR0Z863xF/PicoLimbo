@@ -1,4 +1,4 @@
-//! Forge / NeoForge protocol bridge for PicoLimbo.
+//! Forge / `NeoForge` protocol bridge for `PicoLimbo`.
 //!
 //! The bridge has three responsibilities, each implemented in its own
 //! submodule:

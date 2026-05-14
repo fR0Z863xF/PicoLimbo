@@ -1,6 +1,6 @@
 //! Outbound Velocity Modern Forwarding signer.
 //!
-//! PicoLimbo ships an **inbound** verifier
+//! `PicoLimbo` ships an **inbound** verifier
 //! (`forwarding/check_velocity_key_integrity.rs`) for the case where
 //! Velocity routes a player to us. This module is its mirror: it
 //! constructs a *signed response* to the `velocity:player_info`
@@ -14,16 +14,16 @@
 //! ```text
 //!     Client ── Velocity ── Forge backend #1
 //!                       └── Forge backend #2
-//!                       └── PicoLimbo (us)
+//!                       └── `PicoLimbo` (us)
 //! ```
 //!
-//! Every backend (including PicoLimbo) is configured with
+//! Every backend (including `PicoLimbo`) is configured with
 //! Modern Forwarding, sharing a single HMAC secret with Velocity.
 //! When the recorder needs to connect to a sibling Forge backend to
 //! record its handshake, that backend will reject any connection that
 //! does not pass the Velocity-style HMAC check. To get past that gate
 //! the recorder *itself* has to play the Velocity role outbound, using
-//! the same shared secret PicoLimbo already has in its
+//! the same shared secret `PicoLimbo` already has in its
 //! `[forwarding] modern { secret }` config.
 //!
 //! ## Wire format (Velocity protocol v1)
@@ -92,7 +92,7 @@ impl<'a> OutboundIdentity<'a> {
     /// `127.0.0.1` is sometimes blocked by IP rate-limiters in
     /// production Velocity deployments but is universally accepted by
     /// backend servers.
-    pub fn recorder(username: &'a str) -> Self {
+    pub const fn recorder(username: &'a str) -> Self {
         Self {
             addr: "127.0.0.1",
             uuid: Uuid::nil(),
@@ -137,10 +137,7 @@ fn build_payload(identity: &OutboundIdentity<'_>) -> Result<Vec<u8>, VelocitySig
     Ok(writer.into_inner())
 }
 
-fn write_var_int_string(
-    writer: &mut BinaryWriter,
-    value: &str,
-) -> Result<(), BinaryWriterError> {
+fn write_var_int_string(writer: &mut BinaryWriter, value: &str) -> Result<(), BinaryWriterError> {
     let bytes = value.as_bytes();
     writer.write(&VarInt::new(i32::try_from(bytes.len())?))?;
     writer.write_bytes(bytes)?;
@@ -189,7 +186,11 @@ mod tests {
         let identity = OutboundIdentity::recorder("Probe");
         let signed_a = build_signed_player_info(b"secret-a", &identity).unwrap();
         let signed_b = build_signed_player_info(b"secret-b", &identity).unwrap();
-        assert_ne!(&signed_a[..32], &signed_b[..32], "HMAC signature must depend on secret");
+        assert_ne!(
+            &signed_a[..32],
+            &signed_b[..32],
+            "HMAC signature must depend on secret"
+        );
         // Payload (post-signature) must be identical.
         assert_eq!(&signed_a[32..], &signed_b[32..]);
     }

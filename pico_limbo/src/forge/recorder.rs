@@ -1,3 +1,12 @@
+// The recorder is built around four long state-machine functions
+// (`record_and_persist`, `record_login_phase`, `record_configuration_phase`
+// and `live_probe`). Splitting them up would obscure the linear packet
+// flow they encode, so we keep them long and silence `too_many_lines`.
+// `cast_sign_loss` triggers on `i32 as usize` for VarInt compression
+// thresholds that are already guarded by `>= 0` checks. `if_not_else`
+// is a style preference that would force reordering large match arms.
+#![allow(clippy::too_many_lines, clippy::cast_sign_loss, clippy::if_not_else)]
+
 //! Records a complete Forge handshake against a live upstream server and
 //! persists it as a [`Snapshot`] for later replay.
 //!
@@ -6,7 +15,7 @@
 //! * **FML2** (Minecraft 1.13 – 1.20.1). The handshake happens in the
 //!   Login phase and is composed of clientbound `LoginPluginRequest`
 //!   (`0x04`) packets we capture verbatim. See [`record_fml2`].
-//! * **FML3** (Minecraft 1.20.2+, Forge & NeoForge). The handshake
+//! * **FML3** (Minecraft 1.20.2+, Forge & `NeoForge`). The handshake
 //!   moves to the Configuration phase and uses clientbound Plugin
 //!   Message packets. See [`record_fml3`].
 //!
@@ -16,7 +25,7 @@
 //! client that has *no* mods installed — every plugin message reply is
 //! an empty present payload, which the canonical FML implementations
 //! interpret as "I'm here but I have nothing to add", letting the
-//! handshake progress to LoginSuccess / FinishConfiguration without
+//! handshake progress to `LoginSuccess` / `FinishConfiguration` without
 //! disconnecting us.
 //!
 //! Errors are surfaced as [`UpstreamError`] and never panic; the caller
@@ -27,9 +36,7 @@ use crate::configuration::forge::ForgeConfig;
 use crate::forge::snapshot::{Fml2Snapshot, Fml2Step, Fml3Snapshot, Fml3Step, Snapshot};
 use crate::forge::snapshot_io::{SnapshotIoError, save_snapshot};
 use crate::forge::status_proxy::ForgeStatusCache;
-use crate::forge::upstream_client::{
-    HandshakeIntent, UpstreamClient, UpstreamError, packet_ids,
-};
+use crate::forge::upstream_client::{HandshakeIntent, UpstreamClient, UpstreamError, packet_ids};
 use crate::forge::velocity_forwarder::{
     OutboundIdentity, build_signed_player_info, is_velocity_player_info_channel,
 };
@@ -47,7 +54,7 @@ const FML2_WIRE_PROTOCOL: i32 = 763;
 /// Wire protocol version used by the recorder when talking FML3.
 /// `767` = Minecraft 1.21 — a safe modern default for the Configuration
 /// state handshake. We could also probe `769` (1.21.4), but `767` is
-/// known to be supported by both Forge and NeoForge.
+/// known to be supported by both Forge and `NeoForge`.
 const FML3_WIRE_PROTOCOL: i32 = 767;
 
 /// Convenience port number we send in the Handshake. Any value works
@@ -264,9 +271,7 @@ pub async fn record_and_persist(
     if snapshot.fml3.is_none()
         && let Some(e) = last_config_err.as_ref()
     {
-        debug!(
-            "forge: configuration-phase recording exhausted, last error: {e}"
-        );
+        debug!("forge: configuration-phase recording exhausted, last error: {e}");
     }
 
     let fml2_err = last_login_err.filter(|_| snapshot.fml2.is_none());
@@ -350,11 +355,8 @@ async fn record_login_phase(
     velocity_secret: VelocitySecret<'_>,
 ) -> Result<Fml2Snapshot, UpstreamError> {
     let hostname_with_marker = forge_marker_hostname(&forge_cfg.upstream, marker);
-    let mut client = UpstreamClient::connect(
-        &forge_cfg.upstream,
-        forge_cfg.record_timeout(),
-    )
-    .await?;
+    let mut client =
+        UpstreamClient::connect(&forge_cfg.upstream, forge_cfg.record_timeout()).await?;
 
     client
         .send_handshake(
@@ -413,8 +415,7 @@ async fn record_login_phase(
                     // (PicoLimbo handles its own inbound Velocity
                     // forwarding via `check_velocity_key_integrity`).
                     if let Some(secret) = velocity_secret {
-                        let identity =
-                            OutboundIdentity::recorder(&forge_cfg.recorder_username);
+                        let identity = OutboundIdentity::recorder(&forge_cfg.recorder_username);
                         match build_signed_player_info(secret, &identity) {
                             Ok(signed) => {
                                 debug!(
@@ -423,10 +424,7 @@ async fn record_login_phase(
                                     signed.len()
                                 );
                                 client
-                                    .send_login_plugin_response(
-                                        message_id,
-                                        Some(&signed),
-                                    )
+                                    .send_login_plugin_response(message_id, Some(&signed))
                                     .await?;
                                 continue;
                             }
@@ -450,10 +448,7 @@ async fn record_login_phase(
                     channel,
                     payload.len()
                 );
-                steps.push(Fml2Step {
-                    channel,
-                    payload,
-                });
+                steps.push(Fml2Step { channel, payload });
 
                 // Empty present response is the canonical "no mods,
                 // no preferences, just let me in" reply.
@@ -509,7 +504,7 @@ async fn record_login_phase(
 /// returns the recorded server→client plugin-message sequence.
 ///
 /// The Configuration phase is the vanilla MC state introduced in
-/// 1.20.2 (protocol 764); Forge / NeoForge ≥1.20.2 moved their FML
+/// 1.20.2 (protocol 764); Forge / `NeoForge` ≥1.20.2 moved their FML
 /// handshake into this phase.
 async fn record_configuration_phase(
     forge_cfg: &ForgeConfig,
@@ -518,11 +513,8 @@ async fn record_configuration_phase(
     velocity_secret: VelocitySecret<'_>,
 ) -> Result<Fml3Snapshot, UpstreamError> {
     let hostname_with_marker = forge_marker_hostname(&forge_cfg.upstream, marker);
-    let mut client = UpstreamClient::connect(
-        &forge_cfg.upstream,
-        forge_cfg.record_timeout(),
-    )
-    .await?;
+    let mut client =
+        UpstreamClient::connect(&forge_cfg.upstream, forge_cfg.record_timeout()).await?;
 
     client
         .send_handshake(
@@ -565,8 +557,7 @@ async fn record_configuration_phase(
                                 "invalid compression threshold {threshold}"
                             ))
                         })?;
-                        client
-                            .set_compression(threshold_usize, RECORDER_COMPRESSION_LEVEL);
+                        client.set_compression(threshold_usize, RECORDER_COMPRESSION_LEVEL);
                     }
                 }
                 packet_ids::CB_LOGIN_PLUGIN_REQUEST => {
@@ -579,14 +570,10 @@ async fn record_configuration_phase(
                     let channel = channel.into_inner();
                     if is_velocity_player_info_channel(&channel) {
                         if let Some(secret) = velocity_secret {
-                            let identity = OutboundIdentity::recorder(
-                                &forge_cfg.recorder_username,
-                            );
-                            let signed = build_signed_player_info(secret, &identity)
-                                .map_err(|e| {
-                                    UpstreamError::Malformed(format!(
-                                        "velocity sign failed: {e}"
-                                    ))
+                            let identity = OutboundIdentity::recorder(&forge_cfg.recorder_username);
+                            let signed =
+                                build_signed_player_info(secret, &identity).map_err(|e| {
+                                    UpstreamError::Malformed(format!("velocity sign failed: {e}"))
                                 })?;
                             client
                                 .send_login_plugin_response(message_id, Some(&signed))
@@ -621,13 +608,15 @@ async fn record_configuration_phase(
                 other => {
                     return Err(UpstreamError::UnexpectedPacket {
                         packet_id: other,
-                        reason:
-                            "unexpected packet in FML3 Login phase",
+                        reason: "unexpected packet in FML3 Login phase",
                     });
                 }
             }
         } else {
-            eprintln!("forge[record-cfg]: pkt id=0x{packet_id:02x} ({}B)", raw.data().len());
+            eprintln!(
+                "forge[record-cfg]: pkt id=0x{packet_id:02x} ({}B)",
+                raw.data().len()
+            );
             match packet_id {
                 packet_ids::CB_CONFIG_SELECT_KNOWN_PACKS => {
                     // NeoForge ≥1.20.5 sends this before any FML
@@ -727,14 +716,9 @@ async fn capture_status_forge_data(
 /// Performs a single Status ping against the upstream and returns the
 /// **full** parsed status JSON (so callers can pull both `forgeData`
 /// and `version.protocol` from the same payload).
-async fn fetch_status_json(
-    forge_cfg: &ForgeConfig,
-) -> Result<serde_json::Value, UpstreamError> {
-    let mut client = UpstreamClient::connect(
-        &forge_cfg.upstream,
-        forge_cfg.status_request_timeout(),
-    )
-    .await?;
+async fn fetch_status_json(forge_cfg: &ForgeConfig) -> Result<serde_json::Value, UpstreamError> {
+    let mut client =
+        UpstreamClient::connect(&forge_cfg.upstream, forge_cfg.status_request_timeout()).await?;
     client
         .send_handshake(
             FML3_WIRE_PROTOCOL,
@@ -744,7 +728,9 @@ async fn fetch_status_json(
         )
         .await?;
     client.send_status_request().await?;
-    let raw = client.read_packet(forge_cfg.status_request_timeout()).await?;
+    let raw = client
+        .read_packet(forge_cfg.status_request_timeout())
+        .await?;
     if raw.packet_id() != Some(packet_ids::CB_STATUS_RESPONSE) {
         return Err(UpstreamError::UnexpectedPacket {
             packet_id: raw.packet_id().unwrap_or(0xFF),
@@ -754,9 +740,8 @@ async fn fetch_status_json(
     let mut reader = BinaryReader::new(raw.data());
     let body: VarIntPrefixedString = reader.read()?;
     let body = body.into_inner();
-    let value: serde_json::Value = serde_json::from_str(&body).map_err(|e| {
-        UpstreamError::Malformed(format!("status JSON for snapshot: {e}"))
-    })?;
+    let value: serde_json::Value = serde_json::from_str(&body)
+        .map_err(|e| UpstreamError::Malformed(format!("status JSON for snapshot: {e}")))?;
     Ok(value)
 }
 
@@ -768,7 +753,7 @@ async fn fetch_status_json(
 /// the static probe matrix in that case.
 ///
 /// Why this matters: hardcoding a list of acceptable protocol numbers
-/// breaks every time Mojang or NeoForge ships a new release. Asking
+/// breaks every time Mojang or `NeoForge` ships a new release. Asking
 /// the server makes the recorder version-agnostic.
 async fn detect_upstream_protocol(forge_cfg: &ForgeConfig) -> Option<i32> {
     match fetch_status_json(forge_cfg).await {
@@ -776,29 +761,29 @@ async fn detect_upstream_protocol(forge_cfg: &ForgeConfig) -> Option<i32> {
             let protocol = value
                 .get("version")
                 .and_then(|v| v.get("protocol"))
-                .and_then(|p| p.as_i64())
+                .and_then(serde_json::Value::as_i64)
                 .and_then(|p| i32::try_from(p).ok());
             let name = value
                 .get("version")
                 .and_then(|v| v.get("name"))
                 .and_then(|n| n.as_str())
                 .unwrap_or("?");
-            match protocol {
-                Some(p) => {
-                    info!(
-                        "forge: upstream {} reports MC {} (protocol {p})",
-                        forge_cfg.upstream, name
-                    );
-                    Some(p)
-                }
-                None => {
+            protocol.map_or_else(
+                || {
                     debug!(
                         "forge: upstream {} status JSON has no version.protocol field",
                         forge_cfg.upstream
                     );
                     None
-                }
-            }
+                },
+                |p| {
+                    info!(
+                        "forge: upstream {} reports MC {} (protocol {p})",
+                        forge_cfg.upstream, name
+                    );
+                    Some(p)
+                },
+            )
         }
         Err(e) => {
             debug!(
@@ -824,10 +809,10 @@ fn forge_marker_hostname(upstream: &str, marker: &str) -> String {
 /// something readable to log.
 fn decode_login_disconnect(data: &[u8]) -> String {
     let mut reader = BinaryReader::new(data);
-    match reader.read::<VarIntPrefixedString>() {
-        Ok(s) => s.into_inner(),
-        Err(_) => format!("<unparseable disconnect reason, {} bytes>", data.len()),
-    }
+    reader.read::<VarIntPrefixedString>().map_or_else(
+        |_| format!("<unparseable disconnect reason, {} bytes>", data.len()),
+        VarIntPrefixedString::into_inner,
+    )
 }
 
 #[cfg(test)]
@@ -905,17 +890,13 @@ mod tests {
         // `PICOLIMBO_TEST_VELOCITY_SECRET`; when unset we send None
         // (suitable for a bootstrap server without forwarding).
         let secret = std::env::var("PICOLIMBO_TEST_VELOCITY_SECRET").ok();
-        let snapshot = record_and_persist(
-            &forge_cfg,
-            None,
-            secret.as_deref().map(str::as_bytes),
-        )
-        .await
-        .expect("recording must succeed against a real Forge server");
+        let snapshot = record_and_persist(&forge_cfg, None, secret.as_deref().map(str::as_bytes))
+            .await
+            .expect("recording must succeed against a real Forge server");
 
         // At least one dialect must have produced steps.
-        let fml2_steps = snapshot.fml2.as_ref().map(|s| s.steps.len()).unwrap_or(0);
-        let fml3_steps = snapshot.fml3.as_ref().map(|s| s.steps.len()).unwrap_or(0);
+        let fml2_steps = snapshot.fml2.as_ref().map_or(0, |s| s.steps.len());
+        let fml3_steps = snapshot.fml3.as_ref().map_or(0, |s| s.steps.len());
         eprintln!(
             "recorded: FML2={} steps, FML3={} steps, status_forge_data={}",
             fml2_steps,
@@ -931,9 +912,8 @@ mod tests {
         // recorded FML steps is the *correct* outcome; we keep the
         // status_forge_data side of the snapshot as the load-bearing
         // proof that the upstream is reachable.
-        let captured_anything = fml2_steps > 0
-            || fml3_steps > 0
-            || snapshot.status_forge_data.is_some();
+        let captured_anything =
+            fml2_steps > 0 || fml3_steps > 0 || snapshot.status_forge_data.is_some();
         assert!(
             captured_anything,
             "recording produced absolutely nothing — \
@@ -1026,11 +1006,8 @@ mod tests {
                     if is_velocity_player_info_channel(&channel) {
                         if let Some(secret) = secret.as_deref() {
                             let identity = OutboundIdentity::recorder("Probe");
-                            let signed = build_signed_player_info(
-                                secret.as_bytes(),
-                                &identity,
-                            )
-                            .unwrap();
+                            let signed =
+                                build_signed_player_info(secret.as_bytes(), &identity).unwrap();
                             eprintln!(
                                 "  -> signing velocity:player_info ({}B response)",
                                 signed.len()
@@ -1090,16 +1067,14 @@ mod tests {
         for (strategy_label, strategy) in [
             ("Some(empty)", ResponseStrategy::SomeEmpty),
             ("None (not present)", ResponseStrategy::NotPresent),
-            ("Echo (mirror the request payload)", ResponseStrategy::EchoRequest),
+            (
+                "Echo (mirror the request payload)",
+                ResponseStrategy::EchoRequest,
+            ),
         ] {
             eprintln!("\n=== Strategy: {strategy_label} ===");
 
-            let mut client = match UpstreamClient::connect(
-                &addr,
-                Duration::from_secs(5),
-            )
-            .await
-            {
+            let mut client = match UpstreamClient::connect(&addr, Duration::from_secs(5)).await {
                 Ok(c) => c,
                 Err(e) => {
                     eprintln!("connect failed: {e}");
@@ -1200,7 +1175,7 @@ mod tests {
     /// Diagnostic probe: tries several Login-phase variations against
     /// the live upstream and reports what each one yields. Helps us
     /// figure out whether a recorder failure is caused by the FML
-    /// marker, the declared protocol version, or the LoginStart layout.
+    /// marker, the declared protocol version, or the `LoginStart` layout.
     ///
     /// Run with:
     /// ```text
@@ -1213,7 +1188,7 @@ mod tests {
         let addr = std::env::var("PICOLIMBO_TEST_UPSTREAM")
             .unwrap_or_else(|_| "127.0.0.1:46719".to_string());
 
-        // (label, protocol_version, hostname_marker)
+        // (label, protocol_version, hostname_marker for `LoginStart`)
         let cases: &[(&str, i32, &str)] = &[
             // We learned from a previous run that this upstream is
             // 1.20.1 (protocol 763) but uses FML *net version 3*.
@@ -1226,13 +1201,8 @@ mod tests {
         ];
 
         for (label, protocol, marker) in cases {
-            let host = format!("limbo-probe{}", marker);
-            let mut client = match UpstreamClient::connect(
-                &addr,
-                Duration::from_secs(5),
-            )
-            .await
-            {
+            let host = format!("limbo-probe{marker}");
+            let mut client = match UpstreamClient::connect(&addr, Duration::from_secs(5)).await {
                 Ok(c) => c,
                 Err(e) => {
                     eprintln!("[{label}] connect failed: {e}");

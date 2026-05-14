@@ -23,14 +23,14 @@ impl StructuredForwarding {
     /// Read-only access to the `velocity` sub-config. Used by the
     /// Forge recorder bootstrap path to extract the Modern Forwarding
     /// secret without consuming the structured config.
-    pub fn velocity_view(&self) -> &ModernForwardingConfig {
+    pub const fn velocity_view(&self) -> &ModernForwardingConfig {
         &self.velocity
     }
 }
 
 impl ModernForwardingConfig {
     /// Whether modern forwarding is enabled.
-    pub fn enabled(&self) -> bool {
+    pub const fn enabled(&self) -> bool {
         self.enabled
     }
 
